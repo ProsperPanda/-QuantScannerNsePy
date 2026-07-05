@@ -61,12 +61,12 @@ def chart_dialog(ticker):
         mcol4.metric("Volume", f"{last['volume']:,}")
 
     if st.button("✕ Close"):
-        st.session_state.chart_ticker = None
+        st.session_state.scan_chart_ticker = None
         st.rerun()
 
 
 def show():
-    st.session_state.setdefault("chart_ticker", None)
+    st.session_state.setdefault("scan_chart_ticker", None)
     st.title("🔍 Scan Dashboard")
 
     # Sync trigger in sidebar
@@ -107,7 +107,7 @@ def show():
         if not data["results"]:
             st.warning("No results match the selected strategy.")
             st.session_state.scan_results = None
-            st.session_state.chart_ticker = None
+            st.session_state.scan_chart_ticker = None
         else:
             st.success(f"Found {len(data['results'])} matching stocks (scored {data['total_scored']} total)")
             st.session_state.scan_results = data["results"]
@@ -145,7 +145,7 @@ def show():
         if sel and hasattr(sel, 'selection') and sel.selection and sel.selection.rows:
             row_idx = sel.selection.rows[0]
             ticker = results[row_idx]["ticker"]
-            st.session_state.chart_ticker = ticker
+            st.session_state.scan_chart_ticker = ticker
             st.session_state._st = st.session_state.get("_st", 0) + 1
             st.rerun()
 
@@ -164,5 +164,5 @@ def show():
                 st.divider()
 
     # Open chart popup when a ticker is selected
-    if st.session_state.chart_ticker:
-        chart_dialog(st.session_state.chart_ticker)
+    if st.session_state.scan_chart_ticker:
+        chart_dialog(st.session_state.scan_chart_ticker)

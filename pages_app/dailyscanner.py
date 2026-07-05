@@ -63,7 +63,7 @@ def chart_dialog(ticker):
         mcol4.metric("Volume", f"{last['volume']:,}")
 
     if st.button("✕ Close"):
-        st.session_state.chart_ticker = None
+        st.session_state.daily_chart_ticker = None
         st.rerun()
 
 
@@ -125,7 +125,7 @@ def _scan_ticker(closes, highs, lows, vols, dates, opens=None):
 
 
 def show():
-    st.session_state.setdefault("chart_ticker", None)
+    st.session_state.setdefault("daily_chart_ticker", None)
     st.title("📅 Daily Scanner")
     st.caption("4 mechanical daily-chart strategies: JNSAR, J10SAR, MA Crossover (8/21×144), LRHR 61.8%")
 
@@ -209,7 +209,7 @@ def show():
         if sel and hasattr(sel, 'selection') and sel.selection and sel.selection.rows:
             row_idx = sel.selection.rows[0]
             ticker = rows[row_idx]["Ticker"]
-            st.session_state.chart_ticker = ticker
+            st.session_state.daily_chart_ticker = ticker
             st.session_state._dt = st.session_state.get("_dt", 0) + 1
             st.rerun()
 
@@ -226,5 +226,5 @@ def show():
                 col.metric(label, cnt)
 
     # Open chart popup when a ticker is selected
-    if st.session_state.chart_ticker:
-        chart_dialog(st.session_state.chart_ticker)
+    if st.session_state.daily_chart_ticker:
+        chart_dialog(st.session_state.daily_chart_ticker)
