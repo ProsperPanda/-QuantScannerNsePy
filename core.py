@@ -391,49 +391,64 @@ def get_stock_scan(strategy: str = "All") -> dict:
 
 
 def get_stock_chart(ticker: str, limit: int = 250) -> dict:
-    """Candlestick data with indicators for a single ticker."""
+    """Candlestick data with indicators for a single ticker.
+
+    Optimized: single DB query with LIMIT, Open included, no second connection.
+    """
     t = ticker + ".NS" if not ticker.endswith(".NS") else ticker
     try:
-        closes, highs, lows, vols, dates = _closes_hlv(t, 50)
-        if closes is None:
+        con = _conn()
+        extra = 200  # extra lookback for EMA/MACD/JNSAR indicators
+        rows = con.execute(
+            "SELECT Date, Open, Close, High, Low, Volume FROM DailyBars "
+            "WHERE Ticker = ? ORDER BY Date DESC LIMIT ?",
+            [t, limit + extra]
+        ).fetchall()
+        con.close()
+        if len(rows) < 50:
             return {"ticker": ticker, "candles": [], "error": "Insufficient data"}
     except Exception as e:
         return {"ticker": ticker, "candles": [], "error": str(e)}
 
-    slices = lambda arr: arr[-limit:] if len(arr) > limit else arr
-    cs, hs, ls, vs, ds = slices(closes), slices(highs), slices(lows), slices(vols), slices(dates)
-    ema8_arr = ema(cs, 8)
-    ema21_arr = ema(cs, 21)
-    ema200_val = ema_last(cs, 200)
-    jnsar_arr = jnsar(cs, hs, ls)
-    fib618, _, _ = swing_fib618(cs, hs, ls)
-    macd_l, macd_s = macd(cs)
+    rows.reverse()  # chronological
+
+    opens_all = np.array([float(r[1]) for r in rows], dtype=float)
+    closes_all = np.array([float(r[2]) for r in rows], dtype=float)
+    highs_all = np.array([float(r[3]) for r in rows], dtype=float)
+    lows_all = np.array([float(r[4]) for r in rows], dtype=float)
+    vols_all = np.array([float(r[5]) for r in rows], dtype=float)
+    dates_all = [r[0] for r in rows]
+
+    # Indicator computations on the full data (extra lookback included)
+    ema8_arr = ema(closes_all, 8)
+    ema21_arr = ema(closes_all, 21)
+    ema200_val = ema_last(closes_all, 200)
+    jnsar_arr = jnsar(closes_all, highs_all, lows_all)
+    fib618, _, _ = swing_fib618(closes_all, highs_all, lows_all)
+    macd_l, macd_s = macd(closes_all)
+
+    # Slice to requested limit (last `limit` entries)
+    total = len(closes_all)
+    offset = max(0, total - limit)
+    cs, hs, ls, vs, os_arr = closes_all[offset:], highs_all[offset:], lows_all[offset:], vols_all[offset:], opens_all[offset:]
+    ds = dates_all[offset:]
 
     candles = []
-
-    # Fetch opens separately (not in _closes_hlv)
-    con = _conn()
-    rows = con.execute(
-        "SELECT Date, Open FROM DailyBars WHERE Ticker = ? ORDER BY Date", [t]
-    ).fetchall()
-    con.close()
-    opens_map = {r[0]: float(r[1]) for r in rows}
-
     for i in range(len(ds)):
-        d = ds[i]
+        idx = offset + i
         candles.append({
-            "date": d.isoformat() if hasattr(d, 'isoformat') else str(d),
-            "open": safe_round(opens_map.get(d, cs[i])),
+            "date": ds[i].isoformat() if hasattr(ds[i], 'isoformat') else str(ds[i]),
+            "open": safe_round(os_arr[i]),
             "high": safe_round(hs[i]), "low": safe_round(ls[i]),
             "close": safe_round(cs[i]), "volume": int(vs[i]),
-            "ema8": safe_round(ema8_arr[i]),
-            "ema21": safe_round(ema21_arr[i]),
+            "ema8": safe_round(ema8_arr[idx]),
+            "ema21": safe_round(ema21_arr[idx]),
             "ema200": safe_round(ema200_val) if i == len(ds) - 1 else None,
-            "jnsar": safe_round(jnsar_arr[i]),
+            "jnsar": safe_round(jnsar_arr[idx]),
             "fib618": safe_round(fib618) if i == len(ds) - 1 else None,
-            "macd_line": safe_round(macd_l[i]),
-            "macd_signal": safe_round(macd_s[i]),
-            "macd_histogram": safe_round(macd_l[i] - macd_s[i]),
+            "macd_line": safe_round(macd_l[idx]),
+            "macd_signal": safe_round(macd_s[idx]),
+            "macd_histogram": safe_round(macd_l[idx] - macd_s[idx]),
         })
     return {"ticker": ticker, "candles": candles}
 

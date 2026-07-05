@@ -12,7 +12,7 @@ from core import get_market_regime, get_stock_scan, get_strategies, sync_yahoo_d
 def chart_dialog(ticker):
     st.caption(f"**{ticker}** — Candlestick with EMA 8/21, JNSAR, MACD")
     with st.spinner(f"Loading chart for {ticker}..."):
-        chart_data = get_stock_chart(ticker, 150)
+        chart_data = get_stock_chart(ticker, 100)
 
     if "error" in chart_data or not chart_data.get("candles"):
         st.error(chart_data.get("error", "No chart data available"))
@@ -114,33 +114,40 @@ def show():
     else:
         st.info("Select a strategy and click **Run Scan** to begin.")
 
-    # Results table with all columns + chart button
+    # Results table — click any row to open chart popup
     if st.session_state.get("scan_results"):
         results = st.session_state.scan_results
-        st.markdown("### Results")
-
-        h = st.columns([2, 1.5, 1.2, 0.8, 1.5, 1, 0.8, 0.8, 0.8, 1, 1, 1, 0.6])
-        for c, lbl in zip(h, ["Ticker", "Sector", "Price", "Score", "Strategy", "Conviction",
-                               "RSI", "ADX", "Z-Score", "52W Disc%", "Stop", "Target", ""]):
-            c.markdown(f"**{lbl}**")
-
+        rows = []
         for r in results:
-            ticker = r["ticker"]
-            c = st.columns([2, 1.5, 1.2, 0.8, 1.5, 1, 0.8, 0.8, 0.8, 1, 1, 1, 0.6])
-            c[0].write(ticker)
-            c[1].write(r["sector"])
-            c[2].write(f"{r['price']:.2f}")
-            c[3].write(str(r["score"]))
-            c[4].write(r["strategy"])
-            c[5].write(r["conviction"])
-            c[6].write(f"{r['rsi14']:.1f}")
-            c[7].write(f"{r['adx14']:.1f}")
-            c[8].write(f"{r['z_score']:.2f}")
-            c[9].write(f"{r['discount_52w']:.1f}%")
-            c[10].write(f"{r['stop_loss']:.2f}")
-            c[11].write(f"{r['target1']:.2f}")
-            if c[12].button("📊", key=f"sc_{ticker}"):
-                st.session_state.chart_ticker = ticker
+            rows.append({
+                "Ticker": r["ticker"], "Sector": r["sector"],
+                "Price": r["price"], "Score": r["score"],
+                "Strategy": r["strategy"], "Conviction": r["conviction"],
+                "RSI": r["rsi14"], "ADX": r["adx14"],
+                "Z-Score": r["z_score"], "52W Disc%": r["discount_52w"],
+                "Stop": r["stop_loss"], "Target": r["target1"],
+            })
+
+        df = pd.DataFrame(rows)
+        tbl_key = f"scan_tbl_{st.session_state.get('_st', 0)}"
+        sel = st.dataframe(df, key=tbl_key, use_container_width=True, height=500,
+                           column_config={
+                               "Score": st.column_config.NumberColumn(format="%d"),
+                               "Price": st.column_config.NumberColumn(format="%.2f"),
+                               "RSI": st.column_config.NumberColumn(format="%.1f"),
+                               "ADX": st.column_config.NumberColumn(format="%.1f"),
+                               "Z-Score": st.column_config.NumberColumn(format="%.2f"),
+                               "52W Disc%": st.column_config.NumberColumn(format="%.1f%%"),
+                               "Stop": st.column_config.NumberColumn(format="%.2f"),
+                               "Target": st.column_config.NumberColumn(format="%.2f"),
+                           },
+                           on_select="rerun", selection_mode="single-row")
+        if sel and hasattr(sel, 'selection') and sel.selection and sel.selection.rows:
+            row_idx = sel.selection.rows[0]
+            ticker = results[row_idx]["ticker"]
+            st.session_state.chart_ticker = ticker
+            st.session_state._st = st.session_state.get("_st", 0) + 1
+            st.rerun()
 
         # Detail expander for first few tickers
         with st.expander("📊 Score Breakdown (Top 5)"):

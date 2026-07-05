@@ -14,7 +14,7 @@ import numpy as np
 def chart_dialog(ticker):
     st.caption(f"**{ticker}** — Candlestick with EMA 8/21, JNSAR, MACD")
     with st.spinner(f"Loading chart for {ticker}..."):
-        chart_data = get_stock_chart(ticker, 150)
+        chart_data = get_stock_chart(ticker, 100)
 
     if "error" in chart_data or not chart_data.get("candles"):
         st.error(chart_data.get("error", "No chart data available"))
@@ -190,37 +190,28 @@ def show():
     else:
         st.info("Select a strategy and click **Run Daily Scan** to scan all stocks for signals.")
 
-    # Results table (rendered from session state, outside the if block)
+    # Results table — click any row to open chart popup
     if st.session_state.get("daily_results"):
         rows = st.session_state.daily_results
-        # Determine extra columns present in the data
         extra_cols = [k for k in ["JNSAR", "Mid", "Upper", "Lower", "EMA8", "EMA21", "EMA144",
                                    "GoldenZ", "SwingH", "SwingL"] if k in rows[0]]
 
-        col_widths = [2, 1.2, 1.2, 1, 1, 1] + [1] * len(extra_cols) + [0.6]
-        headers = ["Ticker", "Sector", "Price", "Signal", "SL", "ATR"] + extra_cols + [""]
-
-        h = st.columns(col_widths)
-        for c, lbl in zip(h, headers):
-            c.markdown(f"**{lbl}**")
-
-        for r in rows:
-            c = st.columns(col_widths)
-            ticker = r["Ticker"]
-            c[0].write(ticker)
-            c[1].write(r["Sector"])
-            c[2].write(f"{r['Price']:.2f}")
-            c[3].write(r["Signal"])
-            c[4].write(f"{r['SL']:.2f}")
-            c[5].write(f"{r['ATR']:.2f}")
-            for j, k in enumerate(extra_cols):
-                val = r.get(k, "")
-                if isinstance(val, (int, float)):
-                    c[6 + j].write(f"{val:.2f}")
-                else:
-                    c[6 + j].write(str(val))
-            if c[-1].button("📊", key=f"dc_{ticker}"):
-                st.session_state.chart_ticker = ticker
+        df = pd.DataFrame(rows)
+        col_config = {"Price": st.column_config.NumberColumn(format="%.2f"),
+                      "SL": st.column_config.NumberColumn(format="%.2f"),
+                      "ATR": st.column_config.NumberColumn(format="%.2f")}
+        for k in extra_cols:
+            col_config[k] = st.column_config.NumberColumn(format="%.2f")
+        tbl_key = f"daily_tbl_{st.session_state.get('_dt', 0)}"
+        sel = st.dataframe(df, key=tbl_key, use_container_width=True, height=500,
+                           column_config=col_config,
+                           on_select="rerun", selection_mode="single-row")
+        if sel and hasattr(sel, 'selection') and sel.selection and sel.selection.rows:
+            row_idx = sel.selection.rows[0]
+            ticker = rows[row_idx]["Ticker"]
+            st.session_state.chart_ticker = ticker
+            st.session_state._dt = st.session_state.get("_dt", 0) + 1
+            st.rerun()
 
         # Summary counts
         all_data = st.session_state.get("daily_all_data")
