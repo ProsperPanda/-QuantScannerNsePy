@@ -60,8 +60,9 @@ def _export_parquet(con=None):
             cnt = con.execute(f"SELECT count(*) FROM \"{table}\"").fetchone()[0]
             if cnt == 0:
                 continue
+            safe_path = path.replace('\\', '/')
             con.execute(
-                f"COPY \"{table}\" TO '{path.replace('\\', '/')}' (FORMAT PARQUET, CODEC 'ZSTD', COMPRESSION_LEVEL 22)"
+                f"COPY \"{table}\" TO '{safe_path}' (FORMAT PARQUET, CODEC 'ZSTD', COMPRESSION_LEVEL 22)"
             )
     finally:
         if close_con:
