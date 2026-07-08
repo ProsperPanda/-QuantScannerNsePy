@@ -30,17 +30,29 @@ jobs:
       - name: Sync Yahoo data and export Parquet
         run: |
           python -c "
-          import sys
+          import sys, json
           sys.path.insert(0, '.')
           from core import sync_yahoo_data, sync_sector_data
 
           print('=== Syncing Yahoo data (867 tickers)... ===')
           result = sync_yahoo_data()
+          synced = result.get('synced', 0)
+          errors = result.get('errors', [])
           print(f'Yahoo sync: {result}')
+          print(f'  -> Synced {synced}/{result.get(\"total\", 0)} tickers')
+          if errors:
+              print(f'  -> {len(errors)} errors (first 3): {errors[:3]}')
+          if synced < 100:
+              print('WARNING: Very few tickers synced — yfinance may be rate-limited on runner IP!')
 
           print('=== Syncing sector data (~16 indices)... ===')
           result2 = sync_sector_data()
+          synced2 = result2.get('synced', 0)
           print(f'Sector sync: {result2}')
+          if synced2 < 5:
+              print('WARNING: Very few sectors synced!')
+
+          print('=== DONE ===')
           "
 
       - name: Commit and push updated Parquet files

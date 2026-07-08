@@ -1183,10 +1183,11 @@ def sync_yahoo_data() -> dict:
             # Extract single-level columns if MultiIndex
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
+            con.execute("DELETE FROM DailyBars WHERE Ticker = ?", [ticker])
             for date, row in data.iterrows():
                 dt = date.to_pydatetime()
                 con.execute(
-                    "INSERT OR REPLACE INTO DailyBars (Ticker, Date, Open, High, Low, Close, Volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO DailyBars (Ticker, Date, Open, High, Low, Close, Volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     [ticker, dt, float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), int(row["Volume"])]
                 )
             synced += 1
@@ -1239,10 +1240,11 @@ def sync_sector_data(period: str = "5y") -> dict:
                 continue
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
+            con.execute("DELETE FROM SectorDailyBars WHERE Ticker = ?", [ticker])
             for date, row in data.iterrows():
                 dt = date.to_pydatetime()
                 con.execute(
-                    "INSERT OR REPLACE INTO SectorDailyBars (Ticker, Date, Open, High, Low, Close, Volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO SectorDailyBars (Ticker, Date, Open, High, Low, Close, Volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     [ticker, dt, float(row["Open"]), float(row["High"]),
                      float(row["Low"]), float(row["Close"]), int(row["Volume"])]
                 )
